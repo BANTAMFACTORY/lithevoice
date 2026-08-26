@@ -1,0 +1,32 @@
+# Torch-free profile — see docs/LITE.md
+#
+# Measured: this set installs to ~390 MB, against ~6.0 GB for the default
+# stack, and runs synthesis at the same RTF (0.16) on x86-64 CPU.
+#
+# Deliberately ABSENT and why:
+#   torch / torchaudio  - only Kokoro and the silero-vad wrapper needed them
+#   silero-vad          - the pip package depends on torch; the .onnx model it
+#                         ships is used directly instead (see below)
+#   kokoro              - replaced by lite_backends.OnnxKokoro
+#   misaki[en]          - the [en] extra pulls spacy-curated-transformers,
+#                         which hard-depends on torch. The transformer G2P
+#                         path (trf=True) is not used, so plain misaki plus
+#                         spacy is enough.
+#   onnxruntime-gpu     - CPU wheel only; this profile does not use CUDA
+
+numpy==2.5.0
+onnxruntime==1.22.0
+misaki==0.9.4
+spacy
+num2words
+huggingface-hub==1.22.0
+soundfile==0.14.0
+sounddevice==0.5.5
+onnx-asr==0.11.0
+
+# spaCy English pipeline, needed by misaki's G2P:
+#   pip install https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl
+#
+# Silero VAD weights. The pip package would drag torch in, so fetch the model
+# file alone and point LITHEVOICE_SILERO_ONNX at it:
+#   https://github.com/snakers4/silero-vad/raw/master/src/silero_vad/data/silero_vad.onnx

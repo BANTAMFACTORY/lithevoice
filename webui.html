@@ -1,0 +1,917 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>LitheVoice</title>
+<style>
+  :root {
+    --bg: #101210;
+    --surface: #161917;
+    --surface-raised: #1c201d;
+    --surface-active: #232824;
+    --line: #2d332f;
+    --line-strong: #414a44;
+    --text: #f1f4ef;
+    --muted: #a0aaa3;
+    --quiet: #747e77;
+    --idle: #a8b2ac;
+    --hear: #4fc8b2;
+    --think: #dfb850;
+    --speak: #ef795f;
+    --danger: #ee625c;
+    --success: #78c68b;
+    --focus: #b8df75;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    /* A DEFINITE height, not just a floor. grid-template-rows below uses
+       minmax(0, 1fr) to hand the workspace whatever is left after the topbar,
+       but a row can only be constrained if the container itself is; with only
+       min-height the 1fr row sizes to its content, the transcript grows the
+       page without bound, and the controls get pushed off the bottom of the
+       screen as the conversation goes on. */
+    height: 100vh;
+    height: 100dvh;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    letter-spacing: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+
+  button, select, input { font: inherit; letter-spacing: 0; }
+  button, select { min-height: 44px; }
+  button:focus-visible, select:focus-visible, input:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  button:disabled, select:disabled, input:disabled {
+    cursor: not-allowed;
+    opacity: .45;
+  }
+
+  .topbar {
+    min-height: 68px;
+    padding: max(12px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 12px max(18px, env(safe-area-inset-left));
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    position: relative;
+    z-index: 2;
+  }
+  .brand { display: flex; align-items: center; gap: 11px; min-width: 190px; }
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    display: grid;
+    grid-template-columns: repeat(5, 3px);
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    background: var(--surface-raised);
+  }
+  .brand-mark i { display: block; width: 3px; border-radius: 2px; background: var(--hear); }
+  .brand-mark i:nth-child(1), .brand-mark i:nth-child(5) { height: 7px; background: var(--success); }
+  .brand-mark i:nth-child(2), .brand-mark i:nth-child(4) { height: 14px; background: var(--think); }
+  .brand-mark i:nth-child(3) { height: 20px; background: var(--speak); }
+  .brand-copy { display: grid; line-height: 1.15; }
+  .brand-copy strong { font-size: 15px; font-weight: 700; }
+  .brand-copy span { color: var(--quiet); font-size: 11px; margin-top: 3px; }
+
+  .connection {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .connection-dot {
+    width: 8px;
+    height: 8px;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: var(--danger);
+  }
+  .connection.connected .connection-dot { background: var(--success); }
+  .connection-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar-spacer { flex: 1; }
+  .top-actions { display: flex; align-items: center; gap: 8px; }
+  .command, .icon-command {
+    height: 44px;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    color: var(--text);
+    background: var(--surface-raised);
+    cursor: pointer;
+    transition: background-color .16s, border-color .16s, color .16s;
+  }
+  .command { padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; }
+  .command .command-glyph { color: var(--speak); font-size: 16px; }
+  .command:not(:disabled):hover { background: var(--surface-active); border-color: var(--speak); }
+  .icon-command { width: 44px; padding: 0; color: #f3a09b; font-size: 13px; }
+  .icon-command:not(:disabled):hover { border-color: var(--danger); background: #2b1d1b; }
+
+  #workspace {
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(340px, .9fr) minmax(440px, 1.35fr);
+  }
+  .panel { min-width: 0; min-height: 0; }
+  #signal-panel {
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+    padding: 22px clamp(20px, 3vw, 42px) 24px;
+    display: grid;
+    grid-template-rows: auto minmax(250px, 1fr) auto auto;
+    gap: 16px;
+    /* The page itself no longer scrolls, so on a short window the controls
+       would be clipped and unreachable. Let this column scroll on its own. */
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+  #conversation-panel {
+    background: var(--bg);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .panel-heading {
+    min-height: 30px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .panel-heading h1, .panel-heading h2 {
+    margin: 0;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0;
+  }
+  .panel-heading .heading-spacer { flex: 1; }
+  .route-label, .turn-label {
+    color: var(--quiet);
+    font: 11px/1.3 "Cascadia Mono", Consolas, monospace;
+    white-space: nowrap;
+  }
+  #conversation-panel .panel-heading {
+    padding: 20px 28px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  #stage {
+    width: min(440px, 100%);
+    aspect-ratio: 1;
+    align-self: center;
+    justify-self: center;
+    position: relative;
+    min-width: 0;
+  }
+  #orb { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #stateword {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    width: 170px;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    pointer-events: none;
+  }
+  #stateword .state-name {
+    display: block;
+    font-size: 15px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--idle);
+    transition: color .24s;
+  }
+  #stateword .state-detail {
+    display: block;
+    margin-top: 7px;
+    color: var(--quiet);
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
+  .phase-strip {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .phase {
+    min-width: 0;
+    padding: 10px 8px;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    color: var(--quiet);
+    font-size: 10px;
+    text-transform: uppercase;
+  }
+  .phase + .phase { border-left: 1px solid var(--line); }
+  .phase-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--line-strong); }
+  .phase span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body[data-state="user"] #phase-input { color: var(--hear); }
+  body[data-state="user"] #phase-input .phase-dot { background: var(--hear); }
+  body[data-state="think"] #phase-model { color: var(--think); }
+  body[data-state="think"] #phase-model .phase-dot { background: var(--think); }
+  body[data-state="speak"] #phase-output { color: var(--speak); }
+  body[data-state="speak"] #phase-output .phase-dot { background: var(--speak); }
+
+  .settings {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+    gap: 10px;
+  }
+  .field {
+    min-width: 0;
+    display: grid;
+    gap: 5px;
+    color: var(--quiet);
+    font-size: 11px;
+  }
+  .field select {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    background: var(--surface-raised);
+    color: var(--text);
+    padding: 0 34px 0 11px;
+    cursor: pointer;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .field-speed { grid-column: 1 / -1; }
+  .range-row {
+    min-height: 44px;
+    border: 1px solid var(--line-strong);
+    border-radius: 6px;
+    background: var(--surface-raised);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 48px;
+    align-items: center;
+    gap: 12px;
+    padding: 0 11px;
+  }
+  .range-row input { width: 100%; accent-color: var(--speak); }
+  .range-row output { color: var(--text); text-align: right; font: 12px/1 "Cascadia Mono", Consolas, monospace; }
+
+  #feed {
+    min-height: 0;
+    overflow-y: auto;
+    padding: 18px 28px max(28px, env(safe-area-inset-bottom));
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+  }
+  .empty {
+    min-height: 100%;
+    display: grid;
+    place-content: center;
+    text-align: center;
+    color: var(--quiet);
+  }
+  .empty strong { color: var(--muted); font-size: 14px; font-weight: 600; }
+  .empty span { margin-top: 5px; font-size: 12px; }
+  .msg {
+    width: fit-content;
+    max-width: min(86%, 680px);
+    margin: 0 0 18px;
+    animation: rise .22s ease both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(5px); } }
+  .msg .tag {
+    margin-bottom: 5px;
+    color: var(--quiet);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .msg .bubble {
+    width: fit-content;
+    max-width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--surface-raised);
+    overflow-wrap: anywhere;
+  }
+  .msg.you { margin-left: auto; text-align: right; }
+  .msg.you .bubble { margin-left: auto; border-color: #315a52; background: #17231f; }
+  .msg.ai .tag { color: var(--speak); }
+  .msg.ai .bubble { border-left: 3px solid var(--speak); }
+  .msg.ai .bubble span { animation: rise .18s ease both; }
+  .ref { display: block; margin-top: 5px; color: var(--quiet); font-size: 11px; font-style: italic; }
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 12px;
+    margin: 6px 2px 0;
+    color: var(--quiet);
+    font: 10px/1.4 "Cascadia Mono", Consolas, monospace;
+  }
+  .stats b { color: var(--muted); font-weight: 600; }
+  .sys { margin: 18px 0; color: var(--quiet); font-size: 11px; text-align: center; }
+
+  #toast {
+    position: fixed;
+    right: max(18px, env(safe-area-inset-right));
+    bottom: max(18px, env(safe-area-inset-bottom));
+    max-width: min(360px, calc(100vw - 36px));
+    padding: 10px 12px;
+    border: 1px solid #6e3935;
+    border-radius: 6px;
+    background: #281b19;
+    color: #ffc5bf;
+    font-size: 12px;
+    opacity: 0;
+    transform: translateY(6px);
+    pointer-events: none;
+    transition: opacity .18s, transform .18s;
+    z-index: 5;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 820px) {
+    /* Stacked and page-scrolling is the right pattern on a phone, so hand the
+       height back to the content here. */
+    body { display: block; overflow-y: auto; height: auto; }
+    #signal-panel { overflow-y: visible; }
+    .topbar { position: sticky; top: 0; gap: 10px; }
+    .brand { min-width: 0; }
+    .brand-copy span { display: none; }
+    .connection { order: 3; width: 100%; }
+    #workspace { display: block; }
+    #signal-panel {
+      min-height: calc(100dvh - 68px);
+      padding: 18px 18px 22px;
+      border-right: 0;
+      border-bottom: 1px solid var(--line);
+      grid-template-rows: auto auto auto auto;
+    }
+    #stage { width: min(380px, 88vw); }
+    #conversation-panel { min-height: 62dvh; }
+    #feed { min-height: 52dvh; overflow: visible; padding-inline: 18px; }
+    #conversation-panel .panel-heading { padding-inline: 18px; }
+  }
+
+  @media (max-width: 520px) {
+    .topbar { padding-inline: 12px; }
+    .brand-copy strong { font-size: 14px; }
+    .command { width: 44px; padding: 0; justify-content: center; }
+    .command .command-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+    .settings { grid-template-columns: 1fr; }
+    .field-speed { grid-column: auto; }
+    #stage { width: min(330px, 88vw); }
+    .msg { max-width: 94%; }
+  }
+
+  @media (max-height: 720px) and (min-width: 821px) {
+    #signal-panel { padding-block: 16px; gap: 10px; }
+    #stage { width: min(350px, 48vh); }
+    /* Let the visualiser give up height before the controls do — on a short
+       window the persona/voice/speed row matters more than the orb. */
+    #signal-panel { grid-template-rows: auto minmax(120px, 1fr) auto auto; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body data-state="loading">
+
+<header class="topbar">
+  <div class="brand" aria-label="LitheVoice">
+    <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+    <span class="brand-copy"><strong>LitheVoice</strong><span>local voice runtime</span></span>
+  </div>
+  <div class="connection" id="connection" role="status" aria-live="polite">
+    <span class="connection-dot" aria-hidden="true"></span>
+    <span class="connection-text" id="connection-text">Local runtime · connecting</span>
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="top-actions">
+    <button type="button" class="command" id="btn-int" disabled title="Interrupt the active reply">
+      <span class="command-glyph" aria-hidden="true">↯</span><span class="command-label">Interrupt</span>
+    </button>
+    <button type="button" class="command" id="btn-enroll" title="Learn your voice so other people and background voices cannot take a turn">
+      <span class="command-glyph" aria-hidden="true">☺</span><span class="command-label">Learn my voice</span>
+    </button>
+    <button type="button" class="icon-command" id="btn-stop" disabled aria-label="Stop LitheVoice" title="Stop LitheVoice">■</button>
+  </div>
+</header>
+
+<main id="workspace">
+  <section class="panel" id="signal-panel" aria-labelledby="signal-title">
+    <div class="panel-heading">
+      <h1 id="signal-title">Realtime signal</h1>
+      <span class="heading-spacer"></span>
+      <span class="route-label" id="route-label">Preparing runtime</span>
+    </div>
+
+    <div id="stage">
+      <canvas id="orb" aria-hidden="true"></canvas>
+      <div id="stateword" role="status" aria-live="polite">
+        <span class="state-name" id="state-name">Loading</span>
+        <span class="state-detail" id="state-detail">Preparing local models</span>
+      </div>
+    </div>
+
+    <div class="phase-strip" aria-label="Pipeline activity">
+      <div class="phase" id="phase-input"><span class="phase-dot"></span><span>16 kHz input</span></div>
+      <div class="phase" id="phase-model"><span class="phase-dot"></span><span id="phase-model-label">Local model</span></div>
+      <div class="phase" id="phase-output"><span class="phase-dot"></span><span>24 kHz output</span></div>
+    </div>
+
+    <div class="settings" aria-label="Voice settings">
+      <label class="field" for="s-persona">Persona
+        <select id="s-persona" disabled title="Switch persona and clear conversation memory"></select>
+      </label>
+      <label class="field" for="s-voice">Voice
+        <select id="s-voice" disabled title="Switch synthesis voice"></select>
+      </label>
+      <label class="field field-speed" for="s-speed">Speaking speed
+        <span class="range-row">
+          <input type="range" id="s-speed" min="0.7" max="1.5" step="0.05" value="1" disabled>
+          <output id="speed-output" for="s-speed">1x</output>
+        </span>
+      </label>
+    </div>
+  </section>
+
+  <section class="panel" id="conversation-panel" aria-labelledby="conversation-title">
+    <div class="panel-heading">
+      <h2 id="conversation-title">Conversation</h2>
+      <span class="heading-spacer"></span>
+      <span class="turn-label" id="turn-label">No turns yet</span>
+    </div>
+    <div id="feed" role="log" aria-live="polite" aria-relevant="additions text">
+      <div class="empty" id="empty-state"><strong>Waiting for the first turn</strong><span>The transcript will appear here.</span></div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" role="status" aria-live="assertive"></div>
+
+<script>
+"use strict";
+
+const HUES = {
+  loading: { a:[138,148,141], b:[104,113,107], word:"loading", detail:"Preparing local models" },
+  idle:    { a:[168,178,172], b:[120,198,139], word:"listening", detail:"Waiting for speech" },
+  user:    { a:[ 79,200,178], b:[184,223,117], word:"hearing", detail:"Capturing 16 kHz input" },
+  think:   { a:[223,184, 80], b:[ 86,182,194], word:"thinking", detail:"Generating a local reply" },
+  speak:   { a:[239,121, 95], b:[223,184, 80], word:"speaking", detail:"Streaming 24 kHz audio" },
+  stopped: { a:[238, 98, 92], b:[116,126,119], word:"stopped", detail:"Runtime is offline" },
+};
+
+const N_BANDS = 24;
+const SPOKES = 96;
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const feed = document.getElementById("feed");
+const emptyState = document.getElementById("empty-state");
+const stateName = document.getElementById("state-name");
+const stateDetail = document.getElementById("state-detail");
+const connection = document.getElementById("connection");
+const connectionText = document.getElementById("connection-text");
+const routeLabel = document.getElementById("route-label");
+const modelPhaseLabel = document.getElementById("phase-model-label");
+const turnLabel = document.getElementById("turn-label");
+const toast = document.getElementById("toast");
+const selPersona = document.getElementById("s-persona");
+const selVoice = document.getElementById("s-voice");
+const rngSpeed = document.getElementById("s-speed");
+const speedOutput = document.getElementById("speed-output");
+const btnInterrupt = document.getElementById("btn-int");
+const btnStop = document.getElementById("btn-stop");
+
+let state = "loading";
+let connected = false;
+let ready = false;
+let interruptible = false;
+let pendingControls = 0;
+let turns = 0;
+let aiName = "assistant";
+let aiBubble = null;
+let aiMessage = null;
+let youMessage = null;
+let lastConfig = null;
+let toastTimer = 0;
+let bands = new Float32Array(N_BANDS);
+let agc = 0.001;
+let micLevel = 0;
+let micTarget = 0;
+let lastTts = 0;
+let lastMic = 0;
+let energy = 0;
+const spoke = new Float32Array(SPOKES);
+const col = { a:[...HUES.loading.a], b:[...HUES.loading.b] };
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.textContent = text ?? "";
+  return div.innerHTML;
+}
+
+function element(html) {
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = html;
+  return wrapper.firstElementChild;
+}
+
+function nearBottom() {
+  return feed.scrollHeight - feed.scrollTop - feed.clientHeight < 80;
+}
+
+function settleScroll(stick) {
+  if (stick) requestAnimationFrame(() => { feed.scrollTop = feed.scrollHeight; });
+}
+
+function clearEmpty() {
+  if (emptyState?.isConnected) emptyState.remove();
+}
+
+function pruneFeed() {
+  const messages = [...feed.children].filter(node => !node.classList.contains("empty"));
+  while (messages.length > 120) messages.shift().remove();
+}
+
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove("show"), 3200);
+}
+
+function updateConnection() {
+  connection.classList.toggle("connected", connected);
+  const suffix = !connected ? "reconnecting" : !ready ? "loading" : "connected";
+  connectionText.textContent = `Local runtime · ${suffix}`;
+}
+
+function updateControls() {
+  const active = state === "think" || state === "speak";
+  const available = connected && ready && pendingControls === 0;
+  selPersona.disabled = !available || active || selPersona.options.length === 0;
+  selVoice.disabled = !available || selVoice.options.length === 0;
+  rngSpeed.disabled = !available;
+  btnInterrupt.disabled = !available || !interruptible || !active;
+  btnStop.disabled = !connected || !ready || pendingControls > 0;
+}
+
+function setState(next) {
+  state = next in HUES ? next : "idle";
+  const spec = HUES[state];
+  document.body.dataset.state = state;
+  stateName.textContent = spec.word;
+  stateDetail.textContent = spec.detail;
+  stateName.style.color = `rgb(${spec.a.join(",")})`;
+  if (state !== "speak") agc = Math.max(agc * .7, .001);
+  updateControls();
+}
+
+function routeFor(mode) {
+  if (mode === "direct-audio") return "Audio → Gemma → Kokoro";
+  if (mode === "canned") return "Parakeet → Kokoro";
+  return "Parakeet → Gemma → Kokoro";
+}
+
+function applyConfig(config) {
+  lastConfig = config;
+  ready = Boolean(config.ready);
+  interruptible = Boolean(config.interruptible);
+  aiName = config.persona || "assistant";
+  routeLabel.textContent = routeFor(config.mode);
+  const llm = String(config.llm_device || "auto").toUpperCase();
+  const stt = String(config.stt_device || "cpu").toUpperCase();
+  const tts = String(config.tts_device || "cpu").toUpperCase();
+  modelPhaseLabel.textContent = config.mode === "canned" ? `STT ${stt} · TTS ${tts}` : `STT ${stt} · LLM ${llm} · TTS ${tts}`;
+  fillSelect(selPersona, (config.personas || []).map(name => [name, name]), config.persona);
+  fillSelect(selVoice, config.voices || [], config.voice);
+  if (document.activeElement !== rngSpeed && config.speed != null) {
+    rngSpeed.value = config.speed;
+    speedOutput.value = formatSpeed(config.speed);
+    speedOutput.textContent = formatSpeed(config.speed);
+  }
+  updateConnection();
+  updateControls();
+}
+
+function fillSelect(select, items, current) {
+  const signature = JSON.stringify(items);
+  if (select.dataset.signature !== signature) {
+    select.dataset.signature = signature;
+    select.replaceChildren();
+    for (const [value, label] of items) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = label && label !== value ? `${value} — ${label}` : value;
+      select.appendChild(option);
+    }
+  }
+  if (current != null && document.activeElement !== select) select.value = current;
+}
+
+function formatSpeed(value) {
+  return `${Number(value).toFixed(2).replace(/0+$/, "").replace(/\.$/, "")}x`;
+}
+
+async function control(action, value) {
+  pendingControls += 1;
+  updateControls();
+  try {
+    const response = await fetch("/control", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, value }),
+    });
+    if (!response.ok) {
+      const detail = (await response.text()).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      throw new Error(detail || `Control failed (${response.status})`);
+    }
+    return true;
+  } catch (error) {
+    showToast(error.message || "The local runtime did not accept that change.");
+    if (lastConfig) applyConfig(lastConfig);
+    return false;
+  } finally {
+    pendingControls = Math.max(0, pendingControls - 1);
+    updateControls();
+  }
+}
+
+const events = new EventSource("/events");
+events.onopen = () => {
+  connected = true;
+  updateConnection();
+  updateControls();
+};
+events.onerror = () => {
+  connected = false;
+  updateConnection();
+  updateControls();
+};
+events.onmessage = event => {
+  const payload = JSON.parse(event.data);
+  switch (payload.type) {
+    case "config":
+      applyConfig(payload);
+      break;
+    case "state":
+      setState(payload.state);
+      break;
+    case "sys": {
+      const stick = nearBottom();
+      clearEmpty();
+      feed.appendChild(element(`<div class="sys">${escapeHtml(payload.text)}</div>`));
+      pruneFeed();
+      settleScroll(stick);
+      break;
+    }
+    case "mic":
+      micTarget = Math.min(1, payload.rms * 14) * (.35 + .65 * (payload.p ?? 0));
+      lastMic = performance.now();
+      break;
+    case "tts": {
+      const incoming = payload.bands || [];
+      let maximum = 0;
+      for (let i = 0; i < N_BANDS; i++) {
+        const value = incoming[i] ?? 0;
+        bands[i] = value;
+        maximum = Math.max(maximum, value);
+      }
+      agc = Math.max(maximum, agc * .995, .001);
+      lastTts = performance.now();
+      break;
+    }
+    case "you": {
+      const stick = nearBottom();
+      clearEmpty();
+      turns += 1;
+      turnLabel.textContent = `${turns} ${turns === 1 ? "turn" : "turns"}`;
+      youMessage = element(`<div class="msg you"><div class="tag">You</div><div class="bubble">${escapeHtml(payload.text)}</div></div>`);
+      feed.appendChild(youMessage);
+      aiBubble = null;
+      aiMessage = null;
+      pruneFeed();
+      settleScroll(stick);
+      break;
+    }
+    case "ref":
+      if (youMessage) {
+        const bubble = youMessage.querySelector(".bubble");
+        bubble.textContent = payload.text ?? "";
+        const reference = document.createElement("span");
+        reference.className = "ref";
+        reference.textContent = "Direct audio · Parakeet reference";
+        bubble.appendChild(reference);
+      }
+      break;
+    case "reply": {
+      const stick = nearBottom();
+      clearEmpty();
+      if (!aiBubble) {
+        aiMessage = element(`<div class="msg ai"><div class="tag">${escapeHtml(aiName)}</div><div class="bubble"></div></div>`);
+        feed.appendChild(aiMessage);
+        aiBubble = aiMessage.querySelector(".bubble");
+      }
+      const sentence = document.createElement("span");
+      sentence.textContent = (aiBubble.childNodes.length ? " " : "") + payload.text;
+      aiBubble.appendChild(sentence);
+      pruneFeed();
+      settleScroll(stick);
+      break;
+    }
+    case "stats": {
+      const stick = nearBottom();
+      const values = [];
+      if (payload.v2v_ms != null) values.push(`<b>voice ${Math.round(payload.v2v_ms)} ms</b>`);
+      if (payload.turn_ms != null) values.push(`turn ${Math.round(payload.turn_ms)} ms`);
+      if (payload.ttft_ms != null) values.push(`LLM ${Math.round(payload.ttft_ms)} ms`);
+      if (payload.stt_ms != null) values.push(`STT ${Math.round(payload.stt_ms)} ms`);
+      if (payload.first_ms != null) values.push(`audio ${Math.round(payload.first_ms)} ms`);
+      if (payload.dur_s != null) values.push(`${payload.dur_s.toFixed(1)} s reply`);
+      (aiMessage || feed).appendChild(element(`<div class="stats">${values.map(value => `<span>${value}</span>`).join("")}</div>`));
+      settleScroll(stick);
+      break;
+    }
+    case "barge": {
+      const stick = nearBottom();
+      clearEmpty();
+      feed.appendChild(element('<div class="sys">Reply interrupted</div>'));
+      settleScroll(stick);
+      break;
+    }
+  }
+};
+
+selPersona.addEventListener("change", async () => {
+  const previous = lastConfig?.persona;
+  if (!await control("persona", selPersona.value) && previous != null) selPersona.value = previous;
+});
+selVoice.addEventListener("change", async () => {
+  const previous = lastConfig?.voice;
+  if (!await control("voice", selVoice.value) && previous != null) selVoice.value = previous;
+});
+rngSpeed.addEventListener("input", () => {
+  speedOutput.value = formatSpeed(rngSpeed.value);
+  speedOutput.textContent = formatSpeed(rngSpeed.value);
+});
+rngSpeed.addEventListener("change", async () => {
+  const previous = lastConfig?.speed ?? 1;
+  if (!await control("speed", Number(rngSpeed.value))) {
+    rngSpeed.value = previous;
+    speedOutput.value = formatSpeed(previous);
+    speedOutput.textContent = formatSpeed(previous);
+  }
+});
+btnInterrupt.addEventListener("click", () => control("interrupt", null));
+document.getElementById("btn-enroll").addEventListener("click", () => {
+  control("enroll", null);
+  showToast("Say a sentence, twice — that voice becomes the only one I answer.");
+});
+btnStop.addEventListener("click", () => {
+  if (confirm("Stop the LitheVoice runtime?")) control("shutdown", null);
+});
+
+const canvas = document.getElementById("orb");
+const context = canvas.getContext("2d");
+let lastFrame = 0;
+
+function fitCanvas() {
+  const bounds = canvas.getBoundingClientRect();
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  canvas.width = Math.max(1, Math.round(bounds.width * dpr));
+  canvas.height = Math.max(1, Math.round(bounds.height * dpr));
+}
+addEventListener("resize", fitCanvas);
+fitCanvas();
+
+function lerp(a, b, amount) { return a + (b - a) * amount; }
+function lerpColor(current, target, amount) {
+  for (let i = 0; i < 3; i++) current[i] = lerp(current[i], target[i], amount);
+}
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (now - lastFrame < (reducedMotion ? 100 : 33)) return;
+  lastFrame = now;
+  const width = canvas.width;
+  const height = canvas.height;
+  const radius = Math.min(width, height) * .22;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const time = now / 1000;
+  context.clearRect(0, 0, width, height);
+
+  const ttsFresh = now - lastTts < 280;
+  const micFresh = now - lastMic < 420;
+  micLevel = lerp(micLevel, micFresh ? micTarget : 0, .24);
+  let loudness = 0;
+  for (let i = 0; i < SPOKES; i++) {
+    let value = 0;
+    if (state === "speak" && ttsFresh) {
+      const segment = i % (SPOKES / 2);
+      const mirrored = segment < SPOKES / 4 ? segment : SPOKES / 2 - 1 - segment;
+      const index = (mirrored / (SPOKES / 4 - 1)) * (N_BANDS - 1);
+      const low = Math.floor(index);
+      const raw = lerp(bands[low], bands[Math.min(low + 1, N_BANDS - 1)], index - low) / agc;
+      value = Math.pow(Math.min(1, raw), .72);
+    } else if (state === "user") {
+      value = micLevel * (.78 + .22 * Math.sin(time * 8 + i * 1.4));
+    } else if (state === "think") {
+      value = .09 + .08 * Math.sin(time * 2.8 - i * .42) + .04 * Math.sin(time * 4.1 + i * .7);
+    } else if (state === "loading") {
+      value = .045 + .025 * Math.sin(time * 1.2 + i * .2);
+    } else if (state === "stopped") {
+      value = .025;
+    } else {
+      value = .05 + .025 * Math.sin(time * .8 + i * .24);
+    }
+    spoke[i] = value > spoke[i] ? lerp(spoke[i], value, .55) : lerp(spoke[i], value, .11);
+    loudness += spoke[i];
+  }
+  energy = lerp(energy, loudness / SPOKES, .1);
+
+  const target = HUES[state] || HUES.idle;
+  lerpColor(col.a, target.a, .08);
+  lerpColor(col.b, target.b, .08);
+  const colorA = col.a.map(Math.round);
+  const colorB = col.b.map(Math.round);
+  const rotation = reducedMotion ? 0 : time * (.07 + energy * .35);
+  const scale = width / 440;
+
+  context.save();
+  context.setLineDash([2 * scale, 7 * scale]);
+  for (const ring of [.72, 1, 1.35]) {
+    context.beginPath();
+    context.arc(centerX, centerY, radius * ring, 0, Math.PI * 2);
+    context.strokeStyle = `rgba(${colorA.join(",")},${ring === 1 ? .2 : .1})`;
+    context.lineWidth = Math.max(1, scale);
+    context.stroke();
+  }
+  context.restore();
+
+  context.lineCap = "round";
+  for (let i = 0; i < SPOKES; i++) {
+    const angle = rotation + i / SPOKES * Math.PI * 2;
+    const value = spoke[i];
+    const inner = radius;
+    const outer = radius + value * radius * 1.08 + 1;
+    const mix = i / SPOKES;
+    const red = Math.round(lerp(colorA[0], colorB[0], mix));
+    const green = Math.round(lerp(colorA[1], colorB[1], mix));
+    const blue = Math.round(lerp(colorA[2], colorB[2], mix));
+    context.strokeStyle = `rgba(${red},${green},${blue},${.28 + value * .7})`;
+    context.lineWidth = Math.max(1.4, scale * 2.2);
+    context.beginPath();
+    context.moveTo(centerX + Math.cos(angle) * inner, centerY + Math.sin(angle) * inner);
+    context.lineTo(centerX + Math.cos(angle) * outer, centerY + Math.sin(angle) * outer);
+    context.stroke();
+  }
+
+  context.beginPath();
+  for (let i = 0; i <= SPOKES; i++) {
+    const index = i % SPOKES;
+    const angle = rotation + index / SPOKES * Math.PI * 2;
+    const pointRadius = radius * .97 - spoke[index] * radius * .06;
+    const x = centerX + Math.cos(angle) * pointRadius;
+    const y = centerY + Math.sin(angle) * pointRadius;
+    if (i === 0) context.moveTo(x, y); else context.lineTo(x, y);
+  }
+  context.closePath();
+  context.fillStyle = `rgba(${colorA.join(",")},${.035 + energy * .06})`;
+  context.fill();
+  context.strokeStyle = `rgba(${colorA.join(",")},.5)`;
+  context.lineWidth = Math.max(1, scale);
+  context.stroke();
+
+  context.beginPath();
+  context.arc(centerX, centerY, Math.max(2.5, 3.5 * scale), 0, Math.PI * 2);
+  context.fillStyle = `rgb(${colorB.join(",")})`;
+  context.fill();
+}
+
+requestAnimationFrame(frame);
+setState("loading");
+updateConnection();
+</script>
+</body>
+</html>

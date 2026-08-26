@@ -1,0 +1,46 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Downloaded runtimes and model caches
+models/
+llama.cpp/
+downloads/
+.cache/
+*.gguf
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+
+# Runtime output
+*.log
+/reply_*.wav
+/recordings/
+/outputs/
+/tests/kokoro_test.wav
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+
+# Tooling scratch
+.playwright-mcp/
+
+# Editors and operating systems
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,163 @@
+{
+ "schema_version": 1,
+ "llm": {
+  "repo_id": "ggml-org/gemma-4-E2B-it-GGUF",
+  "revision": "b4243c156154b6dca9324415f8c7ccc098b4aed1",
+  "license": "apache-2.0 (stock Gemma 4 E2B instruction-tuned; llama.cpp-project conversion)",
+  "files": [
+   {
+    "filename": "gemma-4-E2B-it-Q4_0.gguf",
+    "size": 2841481184,
+    "sha256": "8e30dff3ac4c8434c49a7036fa15564bdbb6044e42bf04550bf1a096ad7e6a52"
+   },
+   {
+    "filename": "mmproj-gemma-4-E2B-it-BF16.gguf",
+    "size": 986833664,
+    "sha256": "711e1e8f43fa0664adbac493129be1e6c25b81af4b4cdea97c7d798b25c0a3a4"
+   }
+  ]
+ },
+ "parakeet": {
+  "repo_id": "istupakov/parakeet-tdt-0.6b-v2-onnx",
+  "revision": "0bbb45a3365852604aef28b538a8f066f4ccaa85",
+  "license": "cc-by-4.0",
+  "cpu_files": [
+   "config.json",
+   "vocab.txt",
+   {
+    "filename": "encoder-model.int8.onnx",
+    "size": 652184014,
+    "sha256": "3e0581fda6ab843888b51e56d7ee78b6d5bc3237ec113af1f732d1d5286aa155"
+   },
+   {
+    "filename": "decoder_joint-model.int8.onnx",
+    "size": 8998286,
+    "sha256": "a449f49acd68979d418651dd2dcb737cc0f1bf0225e009e29ee326354edbf7d3"
+   }
+  ],
+  "gpu_files": [
+   "config.json",
+   "vocab.txt",
+   {
+    "filename": "encoder-model.onnx",
+    "size": 41770866,
+    "sha256": "3987bcd28175d829d12888a996a84e8f62a0e374d9ffd640662c1515adc679d3"
+   },
+   {
+    "filename": "encoder-model.onnx.data",
+    "size": 2435420160,
+    "sha256": "4dab7362d4874d85965045b1e41b2d61dd2cc0fb25671a7f6b3dc47bf120cc41"
+   },
+   {
+    "filename": "decoder_joint-model.onnx",
+    "size": 35792059,
+    "sha256": "cbb52a07bd70ab5b67f8439d4b3cd8704b18467b4430bcacb5adabe154b8d191"
+   }
+  ]
+ },
+ "kokoro": {
+  "repo_id": "hexgrad/Kokoro-82M",
+  "revision": "f3ff3571791e39611d31c381e3a41a3af07b4987",
+  "license": "apache-2.0",
+  "model": {
+   "filename": "kokoro-v1_0.pth",
+   "size": 327212226,
+   "sha256": "496dba118d1a58f5f3db2efc88dbdc216e0483fc89fe6e47ee1f2c53f18ad1e4"
+  },
+  "voices": [
+   "af_heart",
+   "af_bella",
+   "af_nicole",
+   "af_sarah",
+   "af_sky",
+   "am_michael",
+   "am_adam",
+   "am_eric",
+   "am_fenrir",
+   "am_puck",
+   "am_onyx",
+   "am_liam"
+  ]
+ },
+ "speaker": {
+  "repo_id": "onnx-community/wespeaker-voxceleb-resnet34-LM",
+  "revision": "6a61a1833ff2583aabeba044f5c8221f00b67ceb",
+  "license": "apache-2.0",
+  "note": "WeSpeaker ResNet34-LM speaker embeddings; used to keep other voices in the room from taking a turn",
+  "file": {
+   "filename": "onnx/model.onnx",
+   "size": 26535549,
+   "sha256": "3955447b0499dc9e0a4541a895df08b03c69098eba4e56c02b5603e9f7f4fcbb"
+  }
+ },
+ "smart_turn": {
+  "repo_id": "pipecat-ai/smart-turn-v3",
+  "revision": "f766f81d3cfdf7737ac64aad813d91bbfd56bf93",
+  "license": "bsd-2-clause",
+  "file": {
+   "filename": "smart-turn-v3.2-cpu.onnx",
+   "sha256": "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f"
+  }
+ },
+ "llama_cpp": {
+  "tag": "b9867",
+  "commit": "152d337fa",
+  "license": "mit",
+  "assets": {
+   "cpu": [
+    {
+     "filename": "llama-b9867-bin-win-cpu-x64.zip",
+     "sha256": "f2c64f32c5ce94e3b92bac030860ef3da6ec0e5b25eed3a5dc1d677f1da88547"
+    }
+   ],
+   "cuda": [
+    {
+     "filename": "llama-b9867-bin-win-cuda-12.4-x64.zip",
+     "sha256": "1bc6db75ed5a34dbe2b55dfb91ff46bab763844b5c1e3d338cf917329c9dcf4a"
+    },
+    {
+     "filename": "cudart-llama-bin-win-cuda-12.4-x64.zip",
+     "sha256": "8c79a9b226de4b3cacfd1f83d24f962d0773be79f1e7b75c6af4ded7e32ae1d6"
+    }
+   ],
+   "vulkan": [
+    {
+     "filename": "llama-b9867-bin-win-vulkan-x64.zip",
+     "sha256": "843333f1aa7d0c52d2e8ba346e635d2ef9832f0d6d667723351c60fd26d71454"
+    }
+   ],
+   "hip": [
+    {
+     "filename": "llama-b9867-bin-win-hip-radeon-x64.zip",
+     "sha256": "29cd9c1afc1ac99d2673ebe7722ba7d60aeed2265776a3c8ca540df590b62e12"
+    }
+   ]
+  },
+  "linux_assets": {
+   "cpu": [
+    {
+     "filename": "llama-b9867-bin-ubuntu-x64.tar.gz",
+     "sha256": "a2dc4404fb43f2bb7818fd3a0602b0e59dfe67ab972ce79b3479ad764249fbd4"
+    }
+   ],
+   "vulkan": [
+    {
+     "filename": "llama-b9867-bin-ubuntu-vulkan-x64.tar.gz",
+     "sha256": "f436e38d10eb53815ee5d6af14f286a7f90339960d060c1391bbf41a84d4a018"
+    }
+   ]
+  }
+ },
+ "kokoro_onnx": {
+  "repo_id": "onnx-community/Kokoro-82M-v1.0-ONNX",
+  "revision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+  "license": "apache-2.0",
+  "note": "torch-free synthesis for the --lite profile; see docs/LITE.md. Voice style vectors are fetched per voice from voices/*.bin",
+  "optional": true,
+  "file": {
+   "filename": "onnx/model.onnx",
+   "size": 325532232,
+   "sha256": "8fbea51ea711f2af382e88c833d9e288c6dc82ce5e98421ea61c058ce21a34cb"
+  }
+ }
+}

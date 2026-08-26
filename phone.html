@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>LitheVoice — phone</title>
+<style>
+  :root{--bg:#101210;--surface:#161917;--line:#2d332f;--text:#f1f4ef;
+        --muted:#a0aaa3;--hear:#4fc8b2;--speak:#ef795f;--danger:#ee625c;}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--text);
+       font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;
+       display:grid;grid-template-rows:auto 1fr auto;
+       padding:max(14px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom));
+       gap:14px;overflow:hidden}
+  header{display:flex;align-items:center;gap:10px}
+  .mark{width:26px;height:26px;border:1px solid var(--line);border-radius:6px;
+        display:grid;grid-template-columns:repeat(3,3px);gap:2px;
+        align-items:center;justify-content:center;background:var(--surface)}
+  .mark i{display:block;width:3px;border-radius:2px;background:var(--hear)}
+  .mark i:nth-child(2){height:16px;background:var(--speak)}
+  .mark i:nth-child(1),.mark i:nth-child(3){height:8px}
+  h1{margin:0;font-size:15px;font-weight:700}
+  #state{margin-left:auto;font-size:12px;color:var(--muted)}
+  main{display:grid;place-content:center;gap:22px;text-align:center;min-height:0}
+  #orb{width:min(58vw,230px);aspect-ratio:1;border-radius:50%;
+       border:1px solid var(--line);background:var(--surface);
+       display:grid;place-content:center;margin:0 auto;
+       transition:transform .12s ease,border-color .2s,box-shadow .2s}
+  #orb b{font-size:13px;font-weight:700;text-transform:uppercase;color:var(--muted)}
+  body[data-s="user"] #orb{border-color:var(--hear);box-shadow:0 0 32px #4fc8b230}
+  body[data-s="speak"] #orb{border-color:var(--speak);box-shadow:0 0 32px #ef795f30}
+  body[data-s="think"] #orb{border-color:#dfb850;box-shadow:0 0 32px #dfb85030}
+  #hint{color:var(--muted);font-size:13px;max-width:30ch;margin:0 auto}
+  button{width:100%;min-height:54px;border-radius:10px;border:1px solid var(--line);
+         background:var(--surface);color:var(--text);font:inherit;font-weight:600;
+         cursor:pointer}
+  button.go{border-color:var(--hear);color:var(--hear)}
+  button.stop{border-color:var(--danger);color:#f3a09b}
+  #log{font:11px/1.45 ui-monospace,Menlo,monospace;color:var(--muted);
+       max-height:22vh;overflow-y:auto;white-space:pre-wrap}
+</style>
+</head>
+<body data-s="idle">
+<header>
+  <span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>
+  <h1>LitheVoice</h1>
+  <span id="state">not connected</span>
+</header>
+
+<main>
+  <div id="orb"><b id="orbtext">tap start</b></div>
+  <p id="hint">Use headphones or AirPods for the cleanest interruption.</p>
+</main>
+
+<button id="btn" class="go">Start talking</button>
+<div id="log"></div>
+
+<script>
+const SR = 16000, FRAME = 512;
+const btn = document.getElementById("btn");
+const logEl = document.getElementById("log");
+const stateEl = document.getElementById("state");
+const orbText = document.getElementById("orbtext");
+let ws, ctx, micNode, stream, playHead = 0, running = false;
+
+function log(m){ logEl.textContent = (m + "\n" + logEl.textContent).slice(0, 1800); }
+function setState(s, label){ document.body.dataset.s = s; orbText.textContent = label || s; }
+
+function wsURL(){
+  const p = new URLSearchParams(location.search);
+  const port = p.get("ap") || (Number(location.port) + 1);
+  const t = p.get("t");
+  return `wss://${location.hostname}:${port}/${t ? "?t=" + encodeURIComponent(t) : ""}`;
+}
+
+async function start(){
+  try{
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      log("ERROR: microphone unavailable. This page must be served over HTTPS.");
+      return;
+    }
+    // The browser's own AEC is what keeps the assistant's voice out of the
+    // microphone when you use the phone's speaker instead of headphones.
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio:{ echoCancellation:true, noiseSuppression:true, autoGainControl:true,
+              channelCount:1 },
+      video:false
+    });
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SR });
+    await ctx.resume();
+    log("audio context @ " + ctx.sampleRate + " Hz");
+
+    ws = new WebSocket(wsURL());
+    ws.binaryType = "arraybuffer";
+    ws.onopen = () => { setState("idle","listening"); stateEl.textContent = "connected"; log("connected"); };
+    ws.onclose = e => { stateEl.textContent = "disconnected"; log("closed " + e.code + " " + (e.reason||"")); stop(); };
+    ws.onerror = () => log("websocket error — check the certificate is accepted");
+    ws.onmessage = ev => playChunk(new Int16Array(ev.data));
+
+    const src = ctx.createMediaStreamSource(stream);
+    // ScriptProcessor is deprecated but is the one path that works the same
+    // on iOS Safari and Android Chrome without shipping a worklet file.
+    micNode = ctx.createScriptProcessor(2048, 1, 1);
+    src.connect(micNode);
+    micNode.connect(ctx.destination);   // required, though we output silence
+    micNode.onaudioprocess = e => {
+      if (!ws || ws.readyState !== 1) return;
+      const inBuf = e.inputBuffer.getChannelData(0);
+      const pcm = new Int16Array(inBuf.length);
+      for (let i = 0; i < inBuf.length; i++){
+        const s = Math.max(-1, Math.min(1, inBuf[i]));
+        pcm[i] = s < 0 ? s * 32768 : s * 32767;
+      }
+      ws.send(pcm.buffer);
+      const out = e.outputBuffer.getChannelData(0);
+      out.fill(0);
+    };
+
+    running = true;
+    btn.textContent = "Stop"; btn.className = "stop";
+    setState("idle","listening");
+  }catch(err){
+    log("ERROR: " + err.message);
+  }
+}
+
+// Reply audio arrives at 24 kHz; schedule it back to back so it plays gaplessly.
+function playChunk(pcm){
+  if (!ctx) return;
+  const buf = ctx.createBuffer(1, pcm.length, 24000);
+  const ch = buf.getChannelData(0);
+  for (let i = 0; i < pcm.length; i++) ch[i] = pcm[i] / 32768;
+  const src = ctx.createBufferSource();
+  src.buffer = buf; src.connect(ctx.destination);
+  const now = ctx.currentTime;
+  if (playHead < now + 0.02) playHead = now + 0.02;   // small cushion
+  src.start(playHead);
+  playHead += buf.duration;
+  setState("speak","speaking");
+  clearTimeout(playChunk._t);
+  playChunk._t = setTimeout(() => setState("idle","listening"), buf.duration * 1000 + 350);
+}
+
+function stop(){
+  running = false;
+  try{ micNode && micNode.disconnect(); }catch(e){}
+  try{ stream && stream.getTracks().forEach(t => t.stop()); }catch(e){}
+  try{ ws && ws.readyState === 1 && ws.close(); }catch(e){}
+  try{ ctx && ctx.close(); }catch(e){}
+  ctx = null; playHead = 0;
+  btn.textContent = "Start talking"; btn.className = "go";
+  setState("idle","tap start");
+}
+
+btn.addEventListener("click", () => running ? stop() : start());
+</script>
+</body>
+</html>

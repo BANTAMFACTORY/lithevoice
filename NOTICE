@@ -1,0 +1,8 @@
+LitheVoice
+Copyright 2026 The LitheVoice Authors
+
+Local, private voice-to-voice: VAD, turn detection, STT, LLM, and TTS on
+your own machine. Ships no model weights; scripts/download_models.py fetches
+pinned, hash-verified artifacts from their upstream sources (see
+scripts/models.json and THIRD_PARTY_NOTICES.md for exact provenance and
+licenses).
