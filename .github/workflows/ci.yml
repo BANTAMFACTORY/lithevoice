@@ -1,0 +1,31 @@
+name: ci
+on:
+  push: { branches: [main] }
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  contract:
+    # The tests that need no models, no GPU and no torch: the release contract
+    # (models.json pinning, CLI surface) and the dashboard's HTTP contract.
+    # 11 tests, under a second, on three packages — measured, not guessed.
+    # sounddevice is imported lazily inside realtime.py's audio functions, so
+    # this job needs no PortAudio.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pytest numpy==2.5.0 soundfile==0.14.0
+      - run: python -m pytest tests/test_release.py tests/test_webui.py -q
+
+  full:
+    # Everything else needs Silero, Kokoro and a downloaded model set. Those
+    # tests skip cleanly when the dependency is absent, so this job is honest
+    # rather than green-by-omission — run it on a machine that has been through
+    # scripts/setup.sh.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: [self-hosted, gpu]
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./.venv/bin/python -m pytest tests/ -q

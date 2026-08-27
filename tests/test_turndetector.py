@@ -17,7 +17,18 @@ import threading
 import time
 
 import numpy as np
-import torch
+try:
+    import torch
+except ModuleNotFoundError:  # the heavy stack is optional; see scripts/setup.sh
+    # Must happen at module level: a missing import breaks pytest COLLECTION,
+    # which no in-test skip can rescue. Touching pytest only on the failure path
+    # keeps `python tests/<file>.py` working unchanged when torch IS installed.
+    import pytest
+
+    pytest.skip(
+        "needs torch and the full voice stack (scripts/setup.sh)",
+        allow_module_level=True,
+    )
 
 from realtime import Models, SmartTurn, TurnDetector, FRAME, SR
 

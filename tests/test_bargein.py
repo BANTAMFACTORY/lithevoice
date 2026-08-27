@@ -91,7 +91,11 @@ def test_utterance_classifier():
 
 def test_live_sim():
     log("=== 2. Live-loop barge simulation (Silero VAD, synthetic stream) ===")
-    from silero_vad import load_silero_vad
+    import pytest
+
+    load_silero_vad = pytest.importorskip(
+        "silero_vad", reason="needs silero-vad (scripts/setup.sh installs it)"
+    ).load_silero_vad
     import soundfile as sf
 
     vad_model = load_silero_vad()
@@ -143,9 +147,16 @@ class FakePlayStream:
 
 def test_speak_cancel():
     log("=== 3. Models.speak cancellation (real Kokoro on CPU) ===")
+    import pytest
     from realtime import Models
 
-    models = Models(tts_device="cpu")
+    # Models() legitimately demands the whole stack — torch, silero-vad,
+    # onnx-asr, kokoro. That is production behaviour worth keeping loud; it is
+    # this TEST that should stand aside when the machine has not been set up.
+    try:
+        models = Models(tts_device="cpu")
+    except (ImportError, ModuleNotFoundError) as exc:
+        pytest.skip(f"voice stack unavailable ({exc}); run scripts/setup.sh")
     long_reply_stream = FakePlayStream()
     cancel = threading.Event()
 

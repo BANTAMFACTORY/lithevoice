@@ -407,6 +407,22 @@ On Linux, substitute `./.venv/bin/python` for `.\.venv\Scripts\python.exe`.
 .\run.ps1 --simulate .\tests\roundtrip_1.wav --no-play --no-llm --no-web --no-menu
 ```
 
+### Test suite
+
+Two tiers, split by what they need:
+
+```bash
+# Contract tier — no models, no GPU, no torch. Needs only pytest, numpy and
+# soundfile; runs in well under a second. This is what CI gates on.
+python -m pytest tests/test_release.py tests/test_webui.py -q
+
+# Everything, on a machine that has been through scripts/setup.sh
+./.venv/bin/python -m pytest tests/ -q
+```
+
+Tests that need Silero, Kokoro or downloaded weights **skip** when those are
+absent rather than fail, so a fresh clone reports honestly instead of red.
+
 ### Barge-in simulation
 
 `tests/bargein_sim.py` runs the real `run_live()` loop against a virtual
