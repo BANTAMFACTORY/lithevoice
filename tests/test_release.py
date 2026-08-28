@@ -48,6 +48,32 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertEqual(len(entry["sha256"]), 64)
             self.assertGreater(entry["size"], 0)
 
+    def test_every_downloaded_artifact_is_attributed(self):
+        """THIRD_PARTY_NOTICES must name every artifact setup fetches.
+
+        The notices table is hand-maintained but the manifest is the truth, so
+        a new model added to models.json without a licence line here fails the
+        release rather than shipping unattributed. Parakeet is CC BY 4.0:
+        attribution is a licence condition, not a courtesy.
+        """
+        root = Path(__file__).parents[1]
+        manifest = json.loads((root / "scripts" / "models.json").read_text(encoding="utf-8"))
+        notices = (root / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
+        missing = []
+        for key, entry in manifest.items():
+            if key == "schema_version" or not isinstance(entry, dict):
+                continue
+            repo = entry.get("repo_id")
+            if repo and repo not in notices:
+                missing.append(f"{key}: {repo} not named in THIRD_PARTY_NOTICES.md")
+            licence = entry.get("license")
+            if licence and licence.split()[0] not in notices:
+                missing.append(f"{key}: licence {licence.split()[0]} not stated")
+            rev = entry.get("revision")
+            if rev and rev[:12] not in notices:
+                missing.append(f"{key}: pinned revision {rev[:12]} not stated")
+        self.assertEqual(missing, [], "\n".join(missing))
+
 
 if __name__ == "__main__":
     unittest.main()
