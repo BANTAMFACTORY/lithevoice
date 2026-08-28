@@ -1,6 +1,27 @@
+<div align="center">
+
 # LitheVoice
 
 **Fast, interruptible voice AI on the hardware you have.**
+
+[![CI](https://github.com/BantamFactory/lithevoice/actions/workflows/ci.yml/badge.svg)](https://github.com/BantamFactory/lithevoice/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12-blue)](#requirements)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey)](#requirements)
+[![Models](https://img.shields.io/badge/weights-none%20bundled-brightgreen)](THIRD_PARTY_NOTICES.md)
+
+**516–597 ms voice-to-voice** &nbsp;·&nbsp; first audio ~145 ms &nbsp;·&nbsp;
+interruption ducks in ~65 ms &nbsp;·&nbsp; no cloud, no API key
+
+<sub>Measured on an RTX 4090 — see [Latency](#latency). A torch-free CPU
+profile installs in ~390 MB and synthesises at the same real-time factor.</sub>
+
+</div>
+
+![The LitheVoice dashboard: a live signal panel on the left showing the
+listening state and the Parakeet to Gemma to Kokoro pipeline, and a conversation
+transcript on the right where every turn carries its own measured latency
+breakdown.](docs/assets/webui.png)
 
 LitheVoice is a local-first voice-agent runtime built around a short path from
 speech to response. It combines voice activity detection, semantic turn
