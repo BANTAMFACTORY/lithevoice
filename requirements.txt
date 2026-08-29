@@ -9,3 +9,6 @@ kokoro==0.9.4
 huggingface-hub==1.22.0
 transformers==5.13.0
 misaki[en]==0.9.4
+# --phone serves the browser microphone over a WebSocket (phone_transport.py,
+# docs/PHONE.md). Without this, --phone raises ModuleNotFoundError on connect.
+websockets==15.0.1

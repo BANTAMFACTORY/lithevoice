@@ -1,6 +1,7 @@
 """Fast release-contract tests that do not load neural models."""
 
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -79,6 +80,38 @@ class ReleaseContractTests(unittest.TestCase):
         # the voice pipeline must survive the skip
         for marker in ("Parakeet", "Kokoro", "Smart Turn"):
             self.assertIn(marker, skipped, f"{marker} lost to --skip-llm")
+
+    def test_third_party_imports_are_declared_in_requirements(self):
+        """Every third-party module the shipped code imports must be installable.
+
+        websockets is what --phone runs on; it was imported by
+        phone_transport.py and documented in docs/PHONE.md, but declared in no
+        requirements file, so phone mode raised ModuleNotFoundError on a clean
+        install. An import nothing installs is a feature that cannot run.
+        """
+        import ast
+        root = Path(__file__).parents[1]
+        # PyPI distributions use hyphens (huggingface-hub) where the import
+        # uses underscores (huggingface_hub); compare on a normalised form.
+        reqs = " ".join((root / f).read_text(encoding="utf-8")
+                        for f in ("requirements.txt", "requirements-lite.txt")).replace("-", "_")
+        stdlib = set(sys.stdlib_module_names)
+        local = {p.stem for p in root.glob("*.py")} | {p.stem for p in (root / "scripts").glob("*.py")}
+        missing = []
+        for src in ("realtime.py", "phone_transport.py", "webui.py", "lite_backends.py", "whisper_features.py"):
+            tree = ast.parse((root / src).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                names = []
+                if isinstance(node, ast.Import):
+                    names = [a.name.split(".")[0] for a in node.names]
+                elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                    names = [node.module.split(".")[0]]
+                for n in names:
+                    if n in stdlib or n in local or n.startswith("_"):
+                        continue
+                    if n.replace("-", "_") not in reqs:
+                        missing.append(f"{src}: imports {n}, declared nowhere")
+        self.assertEqual(sorted(set(missing)), [], "\n".join(sorted(set(missing))))
 
     def test_every_downloaded_artifact_is_attributed(self):
         """THIRD_PARTY_NOTICES must name every artifact setup fetches.
