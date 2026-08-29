@@ -36,6 +36,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--skip-models", action="store_true")
     parser.add_argument("--skip-llama", action="store_true")
+    parser.add_argument("--skip-llm", action="store_true",
+                        help="do not check for the bundled Gemma LLM")
     parser.add_argument("--full", action="store_true", help="also hash all multi-GB model files")
     args = parser.parse_args()
 
@@ -90,7 +92,7 @@ def main() -> int:
     if not args.skip_models:
         model_dir = Path(os.environ.get("LITHEVOICE_MODELS_DIR", PROJECT_ROOT / "models"))
         llm_dir = model_dir / "gemma_4_e2b"
-        for entry in manifest["llm"]["files"]:
+        for entry in ([] if args.skip_llm else manifest["llm"]["files"]):
             path = llm_dir / entry["filename"]
             if not path.is_file():
                 failures.append(f"missing model: {path}")

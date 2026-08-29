@@ -10,6 +10,7 @@ CPU_ONLY=0
 INCLUDE_GPU_STT=0
 SKIP_MODELS=0
 SKIP_LLAMA=0
+SKIP_LLM=0
 FORCE_DOWNLOADS=0
 
 usage() {
@@ -21,6 +22,8 @@ Usage: scripts/setup.sh [options]
   --include-gpu-stt         also fetch the optional fp32 Parakeet (~2.5 GB)
   --skip-models             do not download model weights
   --skip-llama              do not download the llama.cpp runtime
+  --skip-llm                do not download the bundled Gemma LLM
+                            (voice pipeline only; bring your own brain)
   --force-downloads         re-download and re-verify everything
   -h, --help                show this message
 
@@ -39,6 +42,7 @@ while [ $# -gt 0 ]; do
         --include-gpu-stt) INCLUDE_GPU_STT=1; shift ;;
         --skip-models)     SKIP_MODELS=1; shift ;;
         --skip-llama)      SKIP_LLAMA=1; shift ;;
+        --skip-llm)        SKIP_LLM=1; shift ;;
         --force-downloads) FORCE_DOWNLOADS=1; shift ;;
         -h|--help)         usage; exit 0 ;;
         *) echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
@@ -196,6 +200,7 @@ DOWNLOAD_ARGS=("$SCRIPT_DIR/download_models.py" --backend "$RESOLVED_BACKEND")
 [ "$INCLUDE_GPU_STT" -eq 1 ] && DOWNLOAD_ARGS+=(--include-gpu-stt)
 [ "$SKIP_MODELS" -eq 1 ]     && DOWNLOAD_ARGS+=(--skip-models)
 [ "$SKIP_LLAMA" -eq 1 ]      && DOWNLOAD_ARGS+=(--skip-llama)
+[ "$SKIP_LLM" -eq 1 ]        && DOWNLOAD_ARGS+=(--skip-llm)
 [ "$FORCE_DOWNLOADS" -eq 1 ] && DOWNLOAD_ARGS+=(--force)
 echo "Downloading pinned models and llama.cpp ($RESOLVED_BACKEND)..."
 "$VENV_PYTHON" "${DOWNLOAD_ARGS[@]}"
@@ -203,6 +208,7 @@ echo "Downloading pinned models and llama.cpp ($RESOLVED_BACKEND)..."
 DOCTOR_ARGS=("$SCRIPT_DIR/doctor.py")
 [ "$SKIP_MODELS" -eq 1 ] && DOCTOR_ARGS+=(--skip-models)
 [ "$SKIP_LLAMA" -eq 1 ]  && DOCTOR_ARGS+=(--skip-llama)
+[ "$SKIP_LLM" -eq 1 ]    && DOCTOR_ARGS+=(--skip-llm)
 echo 'Checking the installation...'
 "$VENV_PYTHON" "${DOCTOR_ARGS[@]}"
 

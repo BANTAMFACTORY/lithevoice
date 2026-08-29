@@ -48,6 +48,38 @@ class ReleaseContractTests(unittest.TestCase):
             self.assertEqual(len(entry["sha256"]), 64)
             self.assertGreater(entry["size"], 0)
 
+    def test_skip_llm_fetches_the_voice_pipeline_without_the_bundled_llm(self):
+        """--skip-llm must drop Gemma and keep every voice-pipeline artifact.
+
+        LitheVoice can run its whole VAD/turn/STT/TTS path against another
+        program's brain (realtime.py --llm-bridge), and such a host usually
+        already runs a far larger model than the bundled 2B demo. The bundled
+        LLM is the single largest download, so skipping it has to be a real
+        option -- and it must not quietly take Parakeet or Kokoro with it.
+        """
+        import importlib.util
+        root = Path(__file__).parents[1]
+        spec = importlib.util.spec_from_file_location(
+            "dl_models", root / "scripts" / "download_models.py")
+        dl = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(dl)
+        manifest = json.loads((root / "scripts" / "models.json").read_text(encoding="utf-8"))
+
+        import io, contextlib
+        def plan(skip):
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                dl.print_plan(manifest, "cpu", False, skip)
+            return buf.getvalue()
+
+        kept, skipped = plan(False), plan(True)
+        self.assertIn(manifest["llm"]["repo_id"], kept)
+        self.assertNotIn(manifest["llm"]["repo_id"], skipped)
+        self.assertIn("skipped", skipped)
+        # the voice pipeline must survive the skip
+        for marker in ("Parakeet", "Kokoro", "Smart Turn"):
+            self.assertIn(marker, skipped, f"{marker} lost to --skip-llm")
+
     def test_every_downloaded_artifact_is_attributed(self):
         """THIRD_PARTY_NOTICES must name every artifact setup fetches.
 

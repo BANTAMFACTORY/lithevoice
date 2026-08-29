@@ -245,26 +245,32 @@ def download_hugging_face_models(
     include_gpu_stt: bool,
     force: bool,
     include_lite: bool = False,
+    skip_llm: bool = False,
 ) -> None:
     os.environ.setdefault("HF_HOME", str(models_dir / "huggingface"))
     os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
     from huggingface_hub import hf_hub_download, snapshot_download
 
-    llm = manifest["llm"]
-    llm_dir = models_dir / "gemma_4_e2b"
-    llm_dir.mkdir(parents=True, exist_ok=True)
-    print("Gemma 4 E2B")
-    for entry in llm["files"]:
-        path = Path(
-            hf_hub_download(
-                repo_id=llm["repo_id"],
-                filename=entry["filename"],
-                revision=llm["revision"],
-                local_dir=llm_dir,
-                force_download=force,
+    # --skip-llm: fetch the voice pipeline only. LitheVoice can run its whole
+    # VAD/turn/STT/TTS path against another program's brain (realtime.py
+    # --llm-bridge), and that host usually already has a far larger model than
+    # the bundled 2B demo. Skipping it saves the largest single download.
+    if not skip_llm:
+        llm = manifest["llm"]
+        llm_dir = models_dir / "gemma_4_e2b"
+        llm_dir.mkdir(parents=True, exist_ok=True)
+        print("Gemma 4 E2B")
+        for entry in llm["files"]:
+            path = Path(
+                hf_hub_download(
+                    repo_id=llm["repo_id"],
+                    filename=entry["filename"],
+                    revision=llm["revision"],
+                    local_dir=llm_dir,
+                    force_download=force,
+                )
             )
-        )
-        verify(path, entry, entry["filename"])
+            verify(path, entry, entry["filename"])
 
     parakeet = manifest["parakeet"]
     cpu_dir = models_dir / "parakeet-int8"
@@ -352,9 +358,13 @@ def download_hugging_face_models(
     load_silero_vad()
 
 
-def print_plan(manifest: dict, backend: str, include_gpu_stt: bool) -> None:
+def print_plan(manifest: dict, backend: str, include_gpu_stt: bool,
+               skip_llm: bool = False) -> None:
     print("Pinned download plan:")
-    print(f"  Gemma: {manifest['llm']['repo_id']}@{manifest['llm']['revision']}")
+    if skip_llm:
+        print("  Gemma: skipped (--skip-llm; bring your own LLM)")
+    else:
+        print(f"  Gemma: {manifest['llm']['repo_id']}@{manifest['llm']['revision']}")
     print(f"  Parakeet: CPU int8" + (" + optional fp32" if include_gpu_stt else ""))
     print(f"  Kokoro: {len(manifest['kokoro']['voices'])} curated voices")
     print(f"  Smart Turn: {manifest['smart_turn']['file']['filename']}")
@@ -371,6 +381,9 @@ def main() -> int:
     parser.add_argument("--include-lite", action="store_true",
                         help="also fetch the torch-free ONNX synthesiser")
     parser.add_argument("--skip-models", action="store_true")
+    parser.add_argument("--skip-llm", action="store_true",
+                        help="skip the bundled Gemma LLM; fetch only the "
+                             "voice pipeline (VAD, turn, STT, TTS)")
     parser.add_argument("--skip-llama", action="store_true")
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -379,7 +392,7 @@ def main() -> int:
     if sys.maxsize <= 2**32:
         parser.error("64-bit Python is required")
     manifest = load_manifest()
-    print_plan(manifest, args.backend, args.include_gpu_stt)
+    print_plan(manifest, args.backend, args.include_gpu_stt, args.skip_llm)
     if args.dry_run:
         return 0
 
@@ -387,7 +400,7 @@ def main() -> int:
     if not args.skip_models:
         download_hugging_face_models(
             manifest, args.models_dir.resolve(), args.include_gpu_stt,
-            args.force, include_lite=args.include_lite
+            args.force, include_lite=args.include_lite, skip_llm=args.skip_llm
         )
     if not args.skip_llama:
         print(f"llama.cpp {manifest['llama_cpp']['tag']} ({args.backend})")
