@@ -11,6 +11,7 @@ INCLUDE_GPU_STT=0
 SKIP_MODELS=0
 SKIP_LLAMA=0
 SKIP_LLM=0
+INCLUDE_LITE=0
 FORCE_DOWNLOADS=0
 
 usage() {
@@ -20,6 +21,8 @@ Usage: scripts/setup.sh [options]
   --llama-backend BACKEND   auto (default), cpu, or vulkan
   --cpu-only                force CPU PyTorch/ONNX Runtime and CPU llama.cpp
   --include-gpu-stt         also fetch the optional fp32 Parakeet (~2.5 GB)
+  --include-lite            also fetch the torch-free ONNX synthesiser (~330 MB),
+                            which `realtime.py --lite` needs
   --skip-models             do not download model weights
   --skip-llama              do not download the llama.cpp runtime
   --skip-llm                do not download the bundled Gemma LLM
@@ -40,6 +43,7 @@ while [ $# -gt 0 ]; do
         --llama-backend) LLAMA_BACKEND="${2:?--llama-backend needs a value}"; shift 2 ;;
         --cpu-only)        CPU_ONLY=1; shift ;;
         --include-gpu-stt) INCLUDE_GPU_STT=1; shift ;;
+        --include-lite)    INCLUDE_LITE=1; shift ;;
         --skip-models)     SKIP_MODELS=1; shift ;;
         --skip-llama)      SKIP_LLAMA=1; shift ;;
         --skip-llm)        SKIP_LLM=1; shift ;;
@@ -201,6 +205,7 @@ DOWNLOAD_ARGS=("$SCRIPT_DIR/download_models.py" --backend "$RESOLVED_BACKEND")
 [ "$SKIP_MODELS" -eq 1 ]     && DOWNLOAD_ARGS+=(--skip-models)
 [ "$SKIP_LLAMA" -eq 1 ]      && DOWNLOAD_ARGS+=(--skip-llama)
 [ "$SKIP_LLM" -eq 1 ]        && DOWNLOAD_ARGS+=(--skip-llm)
+[ "$INCLUDE_LITE" -eq 1 ]    && DOWNLOAD_ARGS+=(--include-lite)
 [ "$FORCE_DOWNLOADS" -eq 1 ] && DOWNLOAD_ARGS+=(--force)
 echo "Downloading pinned models and llama.cpp ($RESOLVED_BACKEND)..."
 "$VENV_PYTHON" "${DOWNLOAD_ARGS[@]}"
