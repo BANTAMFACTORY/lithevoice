@@ -1988,6 +1988,7 @@ class PTTDetector:
 
 
 def run_live(models, no_play, parallel=True, min_silence_ms=600,
+             spec_silence_ms=200,
              smart_turn=True, barge_in=False, aec=False, llm=None,
              key_barge=False, speaker_lock=False, speaker_ok=None,
              duck_ms=None, cancel_ms=None, snr_db=None,
@@ -2009,7 +2010,8 @@ def run_live(models, no_play, parallel=True, min_silence_ms=600,
         else:
             log("[ptt] walky-talky mode: HOLD ` / ~ to speak, release to send")
     else:
-        det = TurnDetector(models.vad_model, min_silence_ms=min_silence_ms)
+        det = TurnDetector(models.vad_model, min_silence_ms=min_silence_ms,
+                           spec_silence_ms=spec_silence_ms)
         st = SmartTurn() if smart_turn else None
     tune = {k: v for k, v in (("duck_ms", duck_ms),
                               ("cancel_ms", cancel_ms)) if v is not None}
@@ -2476,6 +2478,12 @@ def main():
     ap.add_argument("--serial", action="store_true",
                     help="canned mode only: wait for STT before speaking "
                          "(default: parallel; LLM mode is inherently serial)")
+    ap.add_argument("--spec-silence", type=int, default=200,
+                    help="ms of silence before smart-turn is consulted. Below "
+                         "this, an ordinary mid-sentence pause (a comma runs "
+                         "250-300 ms) gets scored as a finished turn and cuts "
+                         "the speaker off mid-thought; above it, end-of-turn "
+                         "detection costs that much more latency.")
     ap.add_argument("--min-silence", type=int, default=600,
                     help="ms of silence to end a turn by timeout (fallback when "
                          "smart-turn scores the pause incomplete)")
@@ -2695,6 +2703,7 @@ def main():
     else:
         try:
             run_live(models, args.no_play, parallel, args.min_silence,
+                     spec_silence_ms=args.spec_silence,
                      smart_turn=not args.no_smart_turn,
                      barge_in=args.barge_in or args.aec or args.barge_key,
                      aec=args.aec, llm=llm,
